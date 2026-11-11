@@ -1,57 +1,121 @@
 <script setup>
-	import { ref } from 'vue';
-	import axios from 'axios';
+	import {ref, onMounted, onBeforeUnmount} from "vue";
+	import axios from "axios";
 
-	import { Notyf } from 'notyf';
+	import {Notyf} from "notyf";
 	import 'notyf/notyf.min.css';
 
 	const notyf = new Notyf();
 
-	const WEB3FORMS_ACCESS_KEY = '2ec90519-0696-427e-b871-93444d2626e3';
 
-	// Initial value for email:
+	const WEB3FORMS_ACCESS_KEY = "2ec90519-0696-427e-b871-93444d2626e3";
+	const SITE_KEY = "6Le4nxouAAAAANRY02rPi1zJzzNpdyvQ4M54gFx9";
+	// Initial value for the email:
 	const subject = "New message from Portfolio Contact Form";
-	
-	const email = ref('');
-	const message = ref('');
-	const name = ref('');
+
+	const name = ref("");
+	const email = ref("");
+	const message = ref("");
 
 	const isLoading = ref(false);
 
-	// Function for sending an email:
-	const submitForm = async () => {
+	// Function for sending our email:
+	const submitForm = async() => {
+		if (!recaptchaToken.value) {
+		        notyf.error('Please verify that you are not a robot.');
+		        return;
+		    }
+
 		isLoading.value = true;
-		try {
-			const response = await axios.post('https://api.web3forms.com/submit', {
+
+		try{
+			const response = await axios.post("https://api.web3forms.com/submit",{
 				access_key: WEB3FORMS_ACCESS_KEY,
 				subject: subject,
 				name: name.value,
 				email: email.value,
-				message: message.value,
-			}, {
+				message: message.value
+			},{
 				headers: {
-					'Content-Type': 'application/json',
-					Accept: 'application/json'
+					'Content-Type' : "application/json",
+					Accept: "application/json"
 				}
-			});
-
-			const result = response.data;
-
-			if(result.success) {
-				notyf.success('Message sent successfully.');
-
-				name.value = '';
-				email.value = '';
-				message.value = '';
 			}
+		)
 
-		} catch (error) {
-			notyf.error('Failed to send message.');
-		} finally {
-			isLoading.value = false;
+		const result = response.data;
+
+		if(result.success){
+			notyf.success("Message Sent!");
+
+			name.value = "";
+			email.value = "";
+			message.value = "";
 		}
-	};
 
+		}catch(error){
+			notyf.error("Failed to send email!");
+		}finally{
+			isLoading.value=false;
+		}
+	}
+
+
+	const recaptchaContainer = ref(null);
+	const recaptchaWidgetId = ref(null);
+	const recaptchaToken = ref('');
+
+	// Callback called by reCAPTCHA when successful
+	function onRecaptchaSuccess(token) {
+	  recaptchaToken.value = token;
+	}
+
+	// Callback when expired
+	function onRecaptchaExpired() {
+	  recaptchaToken.value = '';
+	}
+
+	// Function to render the reCAPTCHA widget
+	function renderRecaptcha() {
+	  if (!window.grecaptcha) {
+	    console.error('reCAPTCHA not loaded');
+	    return;
+	  }
+
+	  recaptchaWidgetId.value = window.grecaptcha.render(recaptchaContainer.value, {
+	    sitekey: SITE_KEY,
+	    size: 'normal', // or 'compact'
+	    callback: onRecaptchaSuccess,
+	    'expired-callback': onRecaptchaExpired,
+	  });
+	}
+
+	// Function to reset reCAPTCHA 
+	function resetRecaptcha() {
+	  if (recaptchaWidgetId.value !== null) {
+	    window.grecaptcha.reset(recaptchaWidgetId.value);
+	    recaptchaToken.value = '';
+	  }
+	}
+
+
+
+	onMounted(() => {
+	  // This code waits for the Google reCAPTCHA library to load, then renders the reCAPTCHA widget using onMounted hook. 
+	  // The widget is rendered with grecaptcha.render(), which requires a sitekey. 
+	  // Callback functions handle success and expiration events. 
+	  // reCAPTCHA is reset upon form submission to clear the token.
+	  const interval = setInterval(() => {
+	    if (window.grecaptcha && window.grecaptcha.render) {
+	      renderRecaptcha();
+	      clearInterval(interval);
+	    }
+	  }, 100);
+
+	  onBeforeUnmount(() => {
+	    clearInterval(interval);
+	  });
+	});
 </script>
 
 <template>
@@ -71,7 +135,7 @@
 	                                <input v-model="email" type="email" class="form-control contact-form-control" placeholder="Email">
 	                            </div>
 	                            <div class="mb-3">
-	                                <textarea v-model="message" class="form-control contact-form-control" rows="6" placeholder="Message"></textarea>
+	                                <textarea v-model="message"class="form-control contact-form-control" rows="6" placeholder="Message"></textarea>
 	                            </div>
 	                            <div class="form-footer">
 	                                <div class="social-icons">
@@ -80,7 +144,13 @@
 	                                    <a href="https://gitlab.com/cbabbage0991" id="gitlab"><i class="fab fa-gitlab"></i></a>
 	                                    <a href="https://github.com/cbabbage0991" id="github"><i class="fab fa-github"></i></a>
 	                                </div>
-	                                <button type="submit" class="submit-btn pl-5 pr-5" :disabled="isLoading">{{ isLoading ? 'Sending...' : 'Submit' }}</button>
+	                                <button type="submit" class="submit-btn pl-5 pr-5" :disabled="isLoading">{{isLoading ? "Sending..." : "Submit"}}</button>
+	                            </div>
+
+
+	                            <!-- recaptcha checkbox -->
+	                            <div class="d-flex justify-content-end mt-2">
+	                                <div ref="recaptchaContainer"></div>
 	                            </div>
 	                        </form>
 	                        
